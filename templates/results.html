@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Resultados del Análisis</title>
+    <style>
+        body { font-family: sans-serif; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+            table-layout: fixed;
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: center;
+            word-wrap: break-word;
+        }
+        th { background-color: #f2f2f2; }
+        
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #f2f2f2;
+        }
+        
+        .pace-input, .rest-input {
+            width: 60px;
+        }
+        
+        .button-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Resultados del Análisis</h1>
+    
+    <h2>Gráfico de Altimetría</h2>
+    <img src="{{ altimetry_plot_url }}" alt="Gráfico de altimetría">
+
+    <hr>
+
+    <h2>Plano 2D del Circuito</h2>
+    <img src="{{ map_plot_url }}" alt="Plano 2D">
+    
+    <hr>
+
+    <h2>Análisis de Sub-segmentos</h2>
+    <form action="/" method="post" id="mainForm">
+        
+        <!-- New section for rest stops -->
+        <h3>Planificar Paradas/Descansos</h3>
+        <p>Indica la distancia y el tiempo en minutos para cada parada planificada. Haz clic en "Agregar Parada" para añadir más.</p>
+        <table id="restStopsTable">
+            <thead>
+                <tr>
+                    <th>Parada #</th>
+                    <th>Distancia (km)</th>
+                    <th>Tiempo (min)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Default row for rest stop 1 -->
+                <tr>
+                    <td>1</td>
+                    <td><input type="text" class="rest-input" name="rest_stop_km_0" placeholder="Ej: 5.5"></td>
+                    <td><input type="text" class="rest-input" name="rest_stop_min_0" placeholder="Ej: 10"></td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="button-container">
+            <button type="button" onclick="addRestStop()">Agregar Parada</button>
+        </div>
+
+        <hr>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Distancia<br>origen<br>(km)</th>
+                    <th>Altitud<br>Ganada<br>(m)</th>
+                    <th>Altitud<br>Perdida<br>(m)</th>
+                    <th>Pendiente<br>(%)</th>
+                    <th>Ritmo<br>(mm:ss)</th>
+                    <th>Altitud<br>Ganada<br>Acumulada<br>(m)</th>
+                    <th>Altitud<br>Perdida<br>Acumulada<br>(m)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for segment in segment_data %}
+                <tr>
+                    <td>{{ "%.2f"|format(segment.dist_origen_km) }}</td>
+                    <td>{{ "%.2f"|format(segment.altitud_ganada) }}</td>
+                    <td>{{ "%.2f"|format(segment.altitud_perdida) }}</td>
+                    <td>{{ "%.2f"|format(segment.pendiente) }}</td>
+                    <td>
+                        <input type="text" class="pace-input" name="pace_{{ loop.index0 }}" placeholder="mm:ss">
+                        <input type="hidden" name="dist_{{ loop.index0 }}" value="{{ segment.dist_origen_km }}">
+                    </td>
+                    <td>{{ "%.2f"|format(segment.altitud_ganada_acumulada) }}</td>
+                    <td>{{ "%.2f"|format(segment.altitud_perdida_acumulada) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Hidden fields to pass data back to the server -->
+        <input type="hidden" name="pa_locations" value='{{ pa_locations | tojson }}'>
+        <input type="hidden" name="sub_segment_length" value="{{ sub_segment_length }}">
+        <input type="hidden" name="altimetry_plot_url" value="{{ altimetry_plot_url }}">
+        <input type="hidden" name="map_plot_url" value="{{ map_plot_url }}">
+        <input type="hidden" name="segment_data" value='{{ segment_data | tojson }}'>
+
+        <div class="button-container">
+            <input type="hidden" name="action" value="calculate_times">
+            <button type="submit">Calcular Tiempos</button>
+        </div>
+    </form>
+    
+    {% if time_results %}
+    <hr>
+    <h2>Resultados de Tiempos por Sub-segmento</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Distancia<br>origen<br>(km)</th>
+                <th>Tipo</th>
+                <th>Tiempo Acumulado<br>desde el inicio</th>
+                <th>Tiempo Acumulado<br>desde el último PA</th>
+                <th>Ritmo<br>(mm:ss)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for result in time_results %}
+            <tr>
+                <td>{{ "%.2f"|format(result.dist_origen_km) }}</td>
+                <td>{{ result.type }}</td>
+                <td>{{ result.total_time_formatted }}</td>
+                <td>{{ result.pa_time_formatted }}</td>
+                <td>{{ result.pace_formatted }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if pa_summary %}
+    <hr>
+    <h2>Resumen por Puestos de Abastecimiento</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Punto</th>
+                <th>Distancia<br>Total<br>(km)</th>
+                <th>Tiempo<br>Total</th>
+                <th>Distancia<br>Desde PA<br>(km)</th>
+                <th>Tiempo<br>Desde PA</th>
+                <th>Altitud<br>Positiva<br>Total (m)</th>
+                <th>Altitud<br>Positiva<br>Desde PA (m)</th>
+                <th>Altitud<br>Negativa<br>Total (m)</th>
+                <th>Altitud<br>Negativa<br>Desde PA (m)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for summary in pa_summary %}
+            <tr>
+                <td>{{ summary.label }}</td>
+                <td>{{ summary.dist_total_km }}</td>
+                <td>{{ summary.tiempo_total_s }}</td>
+                <td>{{ summary.dist_desde_pa_km }}</td>
+                <td>{{ summary.tiempo_desde_pa_s }}</td>
+                <td>{{ summary.alt_pos_total }}</td>
+                <td>{{ summary.alt_pos_desde_pa }}</td>
+                <td>{{ summary.alt_neg_total }}</td>
+                <td>{{ summary.alt_neg_desde_pa }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <br>
+    <a href="/">Volver a empezar</a>
+
+    <script>
+        let restStopCount = 1;
+        function addRestStop() {
+            const tableBody = document.getElementById('restStopsTable').getElementsByTagName('tbody')[0];
+            const newRow = tableBody.insertRow();
+            
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            
+            cell1.innerHTML = restStopCount + 1;
+            cell2.innerHTML = `<input type="text" class="rest-input" name="rest_stop_km_${restStopCount}" placeholder="Ej: 5.5">`;
+            cell3.innerHTML = `<input type="text" class="rest-input" name="rest_stop_min_${restStopCount}" placeholder="Ej: 10">`;
+
+            restStopCount++;
+        }
+    </script>
+</body>
+</html>
+

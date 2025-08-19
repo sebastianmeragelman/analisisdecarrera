@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Análisis de GPX</title>
+</head>
+<body>
+    <h1>Análisis de Recorrido GPX</h1>
+    <form action="/" method="post" enctype="multipart/form-data">
+        <label for="gpx_file">Selecciona el archivo GPX:</label>
+        <input type="file" name="gpx_file" required><br><br>
+
+        <label for="pa_count">Cantidad de Puestos de Abastecimiento (PA):</label>
+        <input type="number" name="pa_count" id="pa_count" min="0" required><br><br>
+
+        <div id="pa_locations_container"></div>
+
+        <label for="longitud_segmento">Longitud de cada sub-segmento (en metros):</label>
+        <input type="number" name="longitud_segmento" id="longitud_segmento" min="1" required><br><br>
+
+        <br>
+        <input type="submit" value="Analizar">
+    </form>
+
+    <script>
+        document.getElementById('pa_count').addEventListener('input', function() {
+            const count = parseInt(this.value);
+            const container = document.getElementById('pa_locations_container');
+            container.innerHTML = ''; // Limpiar entradas anteriores
+            for (let i = 1; i <= count; i++) {
+                const label = document.createElement('label');
+                label.textContent = `Ubicación del PA ${i} (en KM desde el origen): `;
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.name = `pa_location_${i}`;
+                input.step = "0.1";
+                input.required = true;
+                container.appendChild(label);
+                container.appendChild(input);
+                container.appendChild(document.createElement('br'));
+                container.appendChild(document.createElement('br'));
+            }
+        });
+    </script>
+</body>
+</html>
+
