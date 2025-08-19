@@ -6,6 +6,10 @@
 <body>
     <h1>Análisis de Recorrido GPX</h1>
     <form action="/" method="post" enctype="multipart/form-data">
+        <!-- Nuevo campo para el nombre de la carrera -->
+        <label for="race_name">Nombre de la Carrera:</label>
+        <input type="text" name="race_name" id="race_name" required><br><br>
+
         <label for="gpx_file">Selecciona el archivo GPX:</label>
         <input type="file" name="gpx_file" required><br><br>
 

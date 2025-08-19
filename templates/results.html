@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Resultados del Análisis</title>
+    <!-- El título de la página ahora incluye el nombre de la carrera -->
+    <title>{{ race_name }} - Resultados del Análisis</title>
     <style>
         body { font-family: sans-serif; }
         table { 
@@ -36,7 +37,8 @@
     </style>
 </head>
 <body>
-    <h1>Resultados del Análisis</h1>
+    <!-- Se muestra el nombre de la carrera como un título H1 -->
+    <h1>Resultados del Análisis de {{ race_name }}</h1>
     
     <h2>Gráfico de Altimetría</h2>
     <img src="{{ altimetry_plot_url }}" alt="Gráfico de altimetría">
@@ -108,6 +110,8 @@
         </table>
         
         <!-- Hidden fields to pass data back to the server -->
+        <!-- Se agrega el campo oculto para el nombre de la carrera -->
+        <input type="hidden" name="race_name" value="{{ race_name }}">
         <input type="hidden" name="pa_locations" value='{{ pa_locations | tojson }}'>
         <input type="hidden" name="sub_segment_length" value="{{ sub_segment_length }}">
         <input type="hidden" name="altimetry_plot_url" value="{{ altimetry_plot_url }}">

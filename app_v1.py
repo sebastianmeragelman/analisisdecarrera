@@ -4,37 +4,38 @@ import gpxpy
 import gpxpy.gpx
 import json
 from flask import Flask, render_template, request, url_for, session
+
+# Importar matplotlib y configurar el backend 'Agg' antes que cualquier otro import de matplotlib
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Se configura el backend de Matplotlib para poder generar gráficos
-matplotlib.use('Agg')
 
 # App configuration
 app = Flask(__name__)
+# A secret key is required for Flask sessions
 app.secret_key = 'super_secret_key_for_session'
-# Se define el directorio donde se guardarán los gráficos
+# Define the folder for static files (where plots will be saved)
 app.config['STATIC_FOLDER'] = os.path.join(app.root_path, 'static', 'plots')
-# Asegurarse de que el directorio de gráficos exista
+# Ensure the plots folder exists
 os.makedirs(app.config['STATIC_FOLDER'], exist_ok=True)
 
-def generate_plot(gpx_data, pa_locations, plot_type='altimetry', race_name='Recorrido'):
+def generate_plot(gpx_data, pa_locations, plot_type='altimetry'):
     """
-    Genera un gráfico de altimetría o un mapa 2D y lo devuelve como un buffer de bytes.
-    El parámetro `race_name` se usa para el título del gráfico.
+    Generates an altimetry plot or a 2D map and returns it as a byte buffer.
     """
     if not gpx_data.tracks or not gpx_data.tracks[0].segments:
         raise ValueError("El archivo GPX no contiene datos de tracks o segmentos.")
         
     points = gpx_data.tracks[0].segments[0].points
     
-    # Extraer los datos de los puntos
+    # Extract data from points
     lats = [p.latitude for p in points]
     lons = [p.longitude for p in points]
     alts = [p.elevation for p in points]
     
-    # Calcular la distancia acumulada de los puntos
+    # Calculate the cumulative distance of the points
     dists = [0]
     for i in range(1, len(points)):
         d = points[i].distance_2d(points[i-1])
@@ -42,7 +43,7 @@ def generate_plot(gpx_data, pa_locations, plot_type='altimetry', race_name='Reco
     
     dists_km = [d / 1000 for d in dists]
     
-    # Configurar el estilo del gráfico
+    # Configure plot style
     plt.style.use('seaborn-v0_8-whitegrid')
     fig, ax = plt.subplots(figsize=(12, 6))
     
@@ -56,8 +57,7 @@ def generate_plot(gpx_data, pa_locations, plot_type='altimetry', race_name='Reco
         ax.plot(dists_km, alts, color='#1f77b4', linewidth=2, label='Perfil de Altimetría')
         ax.set_xlabel('Distancia (km)', fontsize=12)
         ax.set_ylabel('Altitud (m)', fontsize=12)
-        # Usamos el nombre de la carrera en el título del gráfico
-        ax.set_title(f'Perfil de Altimetría - {race_name}', fontsize=16, fontweight='bold')
+        ax.set_title('Perfil de Altimetría del Recorrido', fontsize=16, fontweight='bold')
         ax.grid(True, linestyle='--', alpha=0.6)
         
         for i, pa in enumerate(pa_coords):
@@ -70,8 +70,7 @@ def generate_plot(gpx_data, pa_locations, plot_type='altimetry', race_name='Reco
         ax.plot(lons, lats, color='#2ca02c', linewidth=2, label='Recorrido del Circuito')
         ax.set_xlabel('Longitud', fontsize=12)
         ax.set_ylabel('Latitud', fontsize=12)
-        # Usamos el nombre de la carrera en el título del mapa
-        ax.set_title(f'Plano 2D del Circuito - {race_name}', fontsize=16, fontweight='bold')
+        ax.set_title('Plano 2D del Circuito', fontsize=16, fontweight='bold')
         ax.set_aspect('equal', 'box')
         ax.grid(True, linestyle='--', alpha=0.6)
         
@@ -90,15 +89,15 @@ def generate_plot(gpx_data, pa_locations, plot_type='altimetry', race_name='Reco
 
 def analyze_segments(gpx_data, pa_locations, sub_segment_length):
     """
-    Analiza y calcula métricas para sub-segmentos entre los PAs.
+    Analyzes and calculates metrics for sub-segments between PAs.
     
     Args:
-        gpx_data (gpxpy.gpx.GPX): Objeto GPX analizado.
-        pa_locations (list): Lista de ubicaciones de PA en KM.
-        sub_segment_length (int): Longitud de cada sub-segmento en metros.
+        gpx_data (gpxpy.gpx.GPX): Parsed GPX object.
+        pa_locations (list): List of PA locations in KM.
+        sub_segment_length (int): Length of each sub-segment in meters.
         
     Returns:
-        list: Una lista de diccionarios con métricas para cada sub-segmento.
+        list: A list of dictionaries with metrics for each sub-segment.
     """
     if not gpx_data.tracks or not gpx_data.tracks[0].segments:
         return []
@@ -118,23 +117,23 @@ def analyze_segments(gpx_data, pa_locations, sub_segment_length):
     cumulative_gain = 0
     cumulative_loss = 0
     
-    # Iterar a través de cada segmento entre PAs (o inicio/fin de la ruta)
+    # Iterate through each segment between PAs (or start/end of the route)
     for i in range(len(pa_locations_m) - 1):
         start_dist_pa = pa_locations_m[i]
         end_dist_pa = pa_locations_m[i+1]
         
-        # Encontrar los índices de los puntos para el segmento de PA a PA
+        # Find the point indices for the PA-to-PA segment
         start_index_pa = np.argmin(np.abs(np.array(dists) - start_dist_pa))
         end_index_pa = np.argmin(np.abs(np.array(dists) - end_dist_pa))
 
-        # Generar sub-segmentos
+        # Generate sub-segments
         current_sub_dist_from_pa_start = 0
         while current_sub_dist_from_pa_start < (end_dist_pa - start_dist_pa):
             segment_start_dist = start_dist_pa + current_sub_dist_from_pa_start
             
             segment_end_dist = min(start_dist_pa + current_sub_dist_from_pa_start + sub_segment_length, end_dist_pa)
 
-            # Encontrar los puntos GPX correspondientes al sub-segmento
+            # Find the GPX points corresponding to the sub-segment
             start_point_index = np.argmin(np.abs(np.array(dists) - segment_start_dist))
             end_point_index = np.argmin(np.abs(np.array(dists) - segment_end_dist))
             
@@ -144,7 +143,7 @@ def analyze_segments(gpx_data, pa_locations, sub_segment_length):
                 current_sub_dist_from_pa_start = segment_end_dist - start_dist_pa
                 continue
                 
-            # Calcular métricas para el sub-segmento
+            # Calculate metrics for the sub-segment
             gain = 0
             loss = 0
             for j in range(1, len(sub_segment_points)):
@@ -174,7 +173,7 @@ def analyze_segments(gpx_data, pa_locations, sub_segment_length):
     return results
 
 def format_seconds(seconds):
-    """Función de ayuda para formatear segundos a formato hh:mm:ss."""
+    """Helper function to format seconds into hh:mm:ss format."""
     total_hours = int(seconds // 3600)
     total_remaining_seconds = seconds % 3600
     total_minutes = int(total_remaining_seconds // 60)
@@ -183,15 +182,15 @@ def format_seconds(seconds):
 
 def calculate_time_metrics(pace_data, pa_locations, segment_data, rest_stops):
     """
-    Calcula métricas de tiempo acumulado basadas en el ritmo del segmento, la distancia y las paradas.
-    Esta versión maneja correctamente el cálculo del tiempo hasta el punto exacto de una parada.
+    Calculates cumulative time metrics based on segment pace, distance, and rest stops.
+    This version correctly handles time calculation up to the exact point of a rest stop.
     """
     time_results = []
     cumulative_time_seconds = 0
     time_since_last_pa_seconds = 0
     last_event_dist_km = 0
     
-    # Combinar todas las distancias de eventos únicos (cambios de ritmo, PAs y paradas)
+    # Combine all unique event distances (pace changes, PAs, and rest stops)
     event_distances = sorted(list(set(
         [0.0] +
         [item['distance'] for item in pace_data.values()] +
@@ -208,7 +207,7 @@ def calculate_time_metrics(pace_data, pa_locations, segment_data, rest_stops):
         if dist_traveled <= 0:
             continue
             
-        # Determinar el ritmo para este segmento
+        # Determine the pace for this segment
         pace_of_current_segment = '--:--'
         for seg in sorted(pace_data.values(), key=lambda x: x['distance']):
             if seg['distance'] >= current_dist_km:
@@ -222,9 +221,6 @@ def calculate_time_metrics(pace_data, pa_locations, segment_data, rest_stops):
         except (ValueError, IndexError):
             travel_time_seconds = 0
             
-        cumulative_time_seconds += travel_time_seconds
-        time_since_last_pa_seconds += travel_time_seconds
-        
         pa_label = None
         for pa_index, pa_dist in enumerate(pa_locations):
             if abs(pa_dist - current_dist_km) < 0.01:
@@ -236,7 +232,7 @@ def calculate_time_metrics(pace_data, pa_locations, segment_data, rest_stops):
         if rest_stop_match:
             rest_stop_time_seconds = rest_stop_match['time_min'] * 60
 
-        # Crear una entrada de resultado para el segmento de viaje
+        # Create a result entry for the travel segment
         time_results.append({
             'dist_origen_km': round(current_dist_km, 2),
             'type': pa_label if pa_label else 'Segmento',
@@ -247,7 +243,7 @@ def calculate_time_metrics(pace_data, pa_locations, segment_data, rest_stops):
             'pace_formatted': pace_of_current_segment
         })
         
-        # Añadir una entrada separada para el tiempo de descanso si existe
+        # Add a separate entry for the rest time if it exists
         if rest_stop_time_seconds > 0:
             cumulative_time_seconds += rest_stop_time_seconds
             time_since_last_pa_seconds += rest_stop_time_seconds
@@ -269,31 +265,31 @@ def calculate_time_metrics(pace_data, pa_locations, segment_data, rest_stops):
 
 def calculate_pa_summary(pa_locations, segment_data, time_results):
     """
-    Calcula un resumen de métricas para cada puesto de abastecimiento (PA) y el final de la ruta.
+    Calculates a summary of metrics for each aid station (PA) and the end of the route.
     """
     summary_data = []
     
-    # Usar 0 como punto de partida para los cálculos "desde el último PA"
+    # Use 0 as the starting point for "since last PA" calculations
     last_pa_dist_km = 0
     last_pa_time_s = 0
     last_pa_gain = 0
     last_pa_loss = 0
 
-    # Combinar las ubicaciones de PA y el punto final de la ruta
+    # Combine PA locations and the final point of the route
     all_points_km = sorted(list(set(pa_locations + [segment_data[-1]['dist_origen_km']])))
     
     for i, point_dist_km in enumerate(all_points_km):
         
-        # Nueva forma robusta de verificar si el punto es un PA
+        # New robust way to check if the point is a PA
         pa_label = "Final"
         for pa_index, pa_dist in enumerate(pa_locations):
             if abs(pa_dist - point_dist_km) < 0.01:
                 pa_label = f"PA {pa_index + 1}"
                 break
         
-        # Encontrar los datos de segmento y tiempo en este punto
+        # Find the segment and time data at this point
         segment_entry = next((seg for seg in segment_data if abs(seg['dist_origen_km'] - point_dist_km) < 0.01), None)
-        # Encontrar la última entrada de tiempo en o antes del punto actual
+        # Find the last time entry at or before the current point
         time_entry = None
         for res in time_results:
             if abs(res['dist_origen_km'] - point_dist_km) < 0.01 or res['dist_origen_km'] < point_dist_km:
@@ -302,7 +298,7 @@ def calculate_pa_summary(pa_locations, segment_data, time_results):
         if not segment_entry or not time_entry:
             continue
             
-        # Calcular métricas desde el último PA o el inicio
+        # Calculate metrics since the last PA or start
         dist_since_last_pa = point_dist_km - last_pa_dist_km
         time_since_last_pa_s = time_entry['cumulative_time_seconds'] - last_pa_time_s
         
@@ -321,7 +317,7 @@ def calculate_pa_summary(pa_locations, segment_data, time_results):
             'alt_neg_desde_pa': round(loss_since_last_pa, 2),
         })
 
-        # Actualizar los valores del último PA para la siguiente iteración
+        # Update last PA values for the next iteration
         last_pa_dist_km = point_dist_km
         last_pa_time_s = time_entry['cumulative_time_seconds']
         last_pa_gain = segment_entry['altitud_ganada_acumulada']
@@ -331,10 +327,12 @@ def calculate_pa_summary(pa_locations, segment_data, time_results):
 
 @app.route('/', methods=['GET', 'POST'])
 def handle_form():
-    """Maneja la subida del archivo GPX y la generación de gráficos y la tabla."""
+    """Handles the GPX file upload and the generation of plots and the table."""
     
     if request.method == 'POST':
         action = request.form.get('action')
+        # Get the race name from the form
+        race_name = request.form.get('race_name', 'Resultados de la Carrera')
 
         if action == 'calculate_times':
             pace_data = {}
@@ -345,7 +343,7 @@ def handle_form():
                     dist_from_origin_km = float(request.form.get(dist_key, 0))
                     pace_data[key] = {'pace': value, 'distance': dist_from_origin_km}
             
-            # Obtener datos de las paradas
+            # Get rest stop data
             rest_stops = []
             for key, value in request.form.items():
                 if key.startswith('rest_stop_km_'):
@@ -361,9 +359,8 @@ def handle_form():
             pa_locations_str = request.form.get('pa_locations', '[]')
             sub_segment_length_str = request.form.get('sub_segment_length', '0')
             segment_data_str = request.form.get('segment_data', '[]')
-            race_name_str = request.form.get('race_name', 'Resultados')
 
-            # Analizar las cadenas JSON a objetos de Python
+            # Parse JSON strings to Python objects
             pa_locations_km = json.loads(pa_locations_str)
             sub_segment_length = int(sub_segment_length_str)
             segment_data = json.loads(segment_data_str)
@@ -375,7 +372,7 @@ def handle_form():
             pa_summary = calculate_pa_summary(pa_locations_km, segment_data, time_results)
 
             return render_template('results.html',
-                                   race_name=race_name_str, # El nombre de la carrera se pasa a la plantilla
+                                   race_name=race_name,
                                    altimetry_plot_url=altimetry_url,
                                    map_plot_url=map_url,
                                    segment_data=segment_data,
@@ -385,8 +382,6 @@ def handle_form():
                                    pa_summary=pa_summary)
 
         else:
-            # Capturar el nombre de la carrera del formulario
-            race_name = request.form.get('race_name', 'Resultados de Carrera')
             file = request.files.get('gpx_file')
             
             if not file or not file.filename.endswith('.gpx'):
@@ -404,7 +399,8 @@ def handle_form():
                 
                 if total_distance_km == 0:
                     return "Error: No se pudo determinar la distancia del recorrido. El archivo GPX podría no contener datos de movimiento.", 400
-
+                
+                race_name = request.form.get('race_name', 'Resultados de la Carrera')
                 pa_count = int(request.form.get('pa_count', 0))
                 pa_locations_km = []
                 for i in range(1, pa_count + 1):
@@ -418,9 +414,9 @@ def handle_form():
                 if sub_segment_length <= 0:
                      return "Error: La longitud del sub-segmento debe ser un número entero positivo mayor que cero.", 400
 
-                # Pasar el nombre de la carrera a las funciones que generan los gráficos
-                altimetry_buffer = generate_plot(gpx_data, pa_locations_km, 'altimetry', race_name)
-                map_buffer = generate_plot(gpx_data, pa_locations_km, 'map', race_name)
+                # Generate and save plots
+                altimetry_buffer = generate_plot(gpx_data, pa_locations_km, 'altimetry')
+                map_buffer = generate_plot(gpx_data, pa_locations_km, 'map')
                 
                 alt_img_path = os.path.join(app.config['STATIC_FOLDER'], 'altimetry.png')
                 map_img_path = os.path.join(app.config['STATIC_FOLDER'], 'map.png')
@@ -434,7 +430,7 @@ def handle_form():
                 segment_data = analyze_segments(gpx_data, pa_locations_km, sub_segment_length)
                 
                 return render_template('results.html',
-                                       race_name=race_name, # El nombre de la carrera se pasa a la plantilla
+                                       race_name=race_name,
                                        altimetry_plot_url=url_for('static', filename='plots/altimetry.png'),
                                        map_plot_url=url_for('static', filename='plots/map.png'),
                                        segment_data=segment_data,
