@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- El título de la página ahora incluye el nombre de la carrera -->
     <title>{{ race_name }} - Resultados del Análisis</title>
     <style>
         body { font-family: sans-serif; }
@@ -18,18 +17,15 @@
             word-wrap: break-word;
         }
         th { background-color: #f2f2f2; }
-        
         thead {
             position: sticky;
             top: 0;
             z-index: 10;
             background-color: #f2f2f2;
         }
-        
         .pace-input, .rest-input {
             width: 60px;
         }
-        
         .button-container {
             margin-top: 20px;
             text-align: center;
@@ -37,7 +33,6 @@
     </style>
 </head>
 <body>
-    <!-- Se muestra el nombre de la carrera como un título H1 -->
     <h1>Resultados del Análisis de {{ race_name }}</h1>
     
     <h2>Gráfico de Altimetría</h2>
@@ -53,7 +48,6 @@
     <h2>Análisis de Sub-segmentos</h2>
     <form action="/" method="post" id="mainForm">
         
-        <!-- New section for rest stops -->
         <h3>Planificar Paradas/Descansos</h3>
         <p>Indica la distancia y el tiempo en minutos para cada parada planificada. Haz clic en "Agregar Parada" para añadir más.</p>
         <table id="restStopsTable">
@@ -65,7 +59,6 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Default row for rest stop 1 -->
                 <tr>
                     <td>1</td>
                     <td><input type="text" class="rest-input" name="rest_stop_km_0" placeholder="Ej: 5.5"></td>
@@ -85,7 +78,8 @@
                     <th>Distancia<br>origen<br>(km)</th>
                     <th>Altitud<br>Ganada<br>(m)</th>
                     <th>Altitud<br>Perdida<br>(m)</th>
-                    <th>Pendiente<br>(%)</th>
+                    <th>Pendiente<br>Promedio (%)</th>
+                    <th>Pendiente<br>Máxima (°)</th>
                     <th>Ritmo<br>(mm:ss)</th>
                     <th>Altitud<br>Ganada<br>Acumulada<br>(m)</th>
                     <th>Altitud<br>Perdida<br>Acumulada<br>(m)</th>
@@ -97,7 +91,8 @@
                     <td>{{ "%.2f"|format(segment.dist_origen_km) }}</td>
                     <td>{{ "%.2f"|format(segment.altitud_ganada) }}</td>
                     <td>{{ "%.2f"|format(segment.altitud_perdida) }}</td>
-                    <td>{{ "%.2f"|format(segment.pendiente) }}</td>
+                    <td>{{ "%.2f"|format(segment.pendiente_promedio_pct) }}</td>
+                    <td>{{ "%.2f"|format(segment.pendiente_max_angulo) }}</td>
                     <td>
                         <input type="text" class="pace-input" name="pace_{{ loop.index0 }}" placeholder="mm:ss">
                         <input type="hidden" name="dist_{{ loop.index0 }}" value="{{ segment.dist_origen_km }}">
@@ -109,8 +104,6 @@
             </tbody>
         </table>
         
-        <!-- Hidden fields to pass data back to the server -->
-        <!-- Se agrega el campo oculto para el nombre de la carrera -->
         <input type="hidden" name="race_name" value="{{ race_name }}">
         <input type="hidden" name="pa_locations" value='{{ pa_locations | tojson }}'>
         <input type="hidden" name="sub_segment_length" value="{{ sub_segment_length }}">

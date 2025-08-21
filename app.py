@@ -100,16 +100,20 @@ def analyze_segments(gpx_data, pa_locations, sub_segment_length):
     Returns:
         list: Una lista de diccionarios con métricas para cada sub-segmento.
     """
+    import math
+    
     if not gpx_data.tracks or not gpx_data.tracks[0].segments:
         return []
 
     points = gpx_data.tracks[0].segments[0].points
     
+    # Distancia acumulada
     dists = [0]
     for i in range(1, len(points)):
         d = points[i].distance_2d(points[i-1])
         dists.append(dists[-1] + d)
     
+    # PAs en metros
     pa_locations_m = [loc * 1000 for loc in pa_locations]
     pa_locations_m.insert(0, 0)
     pa_locations_m.append(dists[-1])
@@ -118,33 +122,31 @@ def analyze_segments(gpx_data, pa_locations, sub_segment_length):
     cumulative_gain = 0
     cumulative_loss = 0
     
-    # Iterar a través de cada segmento entre PAs (o inicio/fin de la ruta)
+    # Iterar entre PAs
     for i in range(len(pa_locations_m) - 1):
         start_dist_pa = pa_locations_m[i]
         end_dist_pa = pa_locations_m[i+1]
         
-        # Encontrar los índices de los puntos para el segmento de PA a PA
+        # Índices de inicio y fin
         start_index_pa = np.argmin(np.abs(np.array(dists) - start_dist_pa))
         end_index_pa = np.argmin(np.abs(np.array(dists) - end_dist_pa))
 
-        # Generar sub-segmentos
+        # Sub-segmentos dentro del PA
         current_sub_dist_from_pa_start = 0
         while current_sub_dist_from_pa_start < (end_dist_pa - start_dist_pa):
             segment_start_dist = start_dist_pa + current_sub_dist_from_pa_start
-            
             segment_end_dist = min(start_dist_pa + current_sub_dist_from_pa_start + sub_segment_length, end_dist_pa)
 
-            # Encontrar los puntos GPX correspondientes al sub-segmento
+            # Puntos del sub-segmento
             start_point_index = np.argmin(np.abs(np.array(dists) - segment_start_dist))
             end_point_index = np.argmin(np.abs(np.array(dists) - segment_end_dist))
-            
             sub_segment_points = points[start_point_index:end_point_index + 1]
             
             if not sub_segment_points or len(sub_segment_points) < 2:
                 current_sub_dist_from_pa_start = segment_end_dist - start_dist_pa
                 continue
-                
-            # Calcular métricas para el sub-segmento
+
+            # Calcular ganancia y pérdida
             gain = 0
             loss = 0
             for j in range(1, len(sub_segment_points)):
@@ -154,23 +156,35 @@ def analyze_segments(gpx_data, pa_locations, sub_segment_length):
                 else:
                     loss += abs(elevation_change)
             
+            # Altura máxima y mínima
+            alts_segment = [p.elevation for p in sub_segment_points]
+            max_alt = max(alts_segment)
+            min_alt = min(alts_segment)
+            delta_h = max_alt - min_alt
+
+            # Distancia horizontal
             segment_horizontal_dist = sub_segment_points[-1].distance_2d(sub_segment_points[0])
-            slope = (gain - loss) / segment_horizontal_dist * 100 if segment_horizontal_dist > 0 else 0
-            
+
+            # Pendientes
+            pendiente_promedio_pct = (gain - loss) / segment_horizontal_dist * 100 if segment_horizontal_dist > 0 else 0
+            pendiente_max_angulo = math.degrees(math.atan(delta_h / segment_horizontal_dist)) if segment_horizontal_dist > 0 else 0
+
             cumulative_gain += gain
             cumulative_loss += loss
-            
+
             results.append({
                 'dist_origen_km': (segment_end_dist) / 1000,
                 'altitud_ganada': gain,
                 'altitud_perdida': loss,
-                'pendiente': slope,
+                'pendiente_promedio_pct': pendiente_promedio_pct,
+                'pendiente_max_angulo': pendiente_max_angulo,
                 'altitud_ganada_acumulada': cumulative_gain,
                 'altitud_perdida_acumulada': cumulative_loss,
                 'distance_meters': segment_end_dist - segment_start_dist
             })
             
             current_sub_dist_from_pa_start = segment_end_dist - start_dist_pa
+    
     return results
 
 def format_seconds(seconds):
