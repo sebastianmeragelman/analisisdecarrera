@@ -85,7 +85,13 @@
                         <td class="p-2 border border-gray-300 text-center">{{ "%.2f"|format(segment.pendiente_promedio_pct) }}</td>
                         <td class="p-2 border border-gray-300 text-center">{{ "%.2f"|format(segment.pendiente_max_angulo) }}</td>
                         <td class="p-2 border border-gray-300 text-center">
-                            <input type="text" class="pace-input w-full p-1 border border-gray-300 rounded-md text-center" name="pace_{{ loop.index0 }}" placeholder="mm:ss">
+                            <div class="flex items-center justify-center">
+                                <input type="tel" id="minutes_{{ loop.index0 }}" class="pace-input w-8 p-1 border border-gray-300 rounded-md text-center" maxlength="2" placeholder="mm">
+                                <span class="mx-1">:</span>
+                                <input type="tel" id="seconds_{{ loop.index0 }}" class="pace-input w-8 p-1 border border-gray-300 rounded-md text-center" maxlength="2" placeholder="ss">
+                                <!-- Campo oculto que será enviado al servidor con el formato correcto -->
+                                <input type="hidden" id="pace_{{ loop.index0 }}" name="pace_{{ loop.index0 }}">
+                            </div>
                             <input type="hidden" name="dist_{{ loop.index0 }}" value="{{ segment.dist_origen_km }}">
                         </td>
                         <td class="p-2 border border-gray-300 text-center">{{ "%.2f"|format(segment.altitud_ganada_acumulada) }}</td>
@@ -178,7 +184,6 @@
     </div>
 
     <script>
-        // La lógica de JavaScript original no ha sido modificada
         let restStopCount = 1;
         function addRestStop() {
             const tableBody = document.getElementById('restStopsTable').getElementsByTagName('tbody')[0];
@@ -194,6 +199,66 @@
 
             restStopCount++;
         }
+        
+        // Listener para mover el foco automáticamente
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mover de minutos a segundos
+            const minutesInputs = document.querySelectorAll('input[id^="minutes_"]');
+            minutesInputs.forEach(input => {
+                input.addEventListener('input', (e) => {
+                    if (e.target.value.length === e.target.maxLength) {
+                        const segmentIndex = e.target.id.split('_')[1];
+                        const nextField = document.getElementById(`seconds_${segmentIndex}`);
+                        if (nextField) {
+                            nextField.focus();
+                        }
+                    }
+                });
+            });
+
+            // Mover de segundos a la siguiente fila de minutos
+            const secondsInputs = document.querySelectorAll('input[id^="seconds_"]');
+            secondsInputs.forEach(input => {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                        e.preventDefault();
+                        const segmentIndex = parseInt(e.target.id.split('_')[1], 10);
+                        const nextMinuteField = document.getElementById(`minutes_${segmentIndex + 1}`);
+                        if (nextMinuteField) {
+                            nextMinuteField.focus();
+                        } else {
+                            const calculateButton = document.querySelector('button[type="submit"]');
+                            if (calculateButton) {
+                                calculateButton.focus();
+                            }
+                        }
+                    }
+                });
+            });
+
+            // Capturar el evento de submit para formatear el ritmo antes de enviar
+            const mainForm = document.getElementById('mainForm');
+            mainForm.addEventListener('submit', (e) => {
+                // Iterar sobre todos los segmentos para formatear el ritmo
+                document.querySelectorAll('input[id^="minutes_"]').forEach(minuteInput => {
+                    const segmentIndex = minuteInput.id.split('_')[1];
+                    const secondsInput = document.getElementById(`seconds_${segmentIndex}`);
+                    const paceHiddenInput = document.getElementById(`pace_${segmentIndex}`);
+
+                    let minutes = minuteInput.value.padStart(2, '0');
+                    let seconds = secondsInput.value.padStart(2, '0');
+                    
+                    // Si ambos campos tienen valor, formatea y asigna al campo oculto
+                    if (minutes !== '00' || seconds !== '00') {
+                        const formattedPace = `${minutes}:${seconds}`;
+                        paceHiddenInput.value = formattedPace;
+                    } else {
+                        // Si ambos están vacíos, no enviar valor
+                        paceHiddenInput.value = '';
+                    }
+                });
+            });
+        });
     </script>
 </body>
 </html>
