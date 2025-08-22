@@ -1,47 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Análisis de GPX</title>
+    <!-- Incluye Tailwind CSS para estilos de utilidad -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados si son necesarios */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
 </head>
-<body>
-    <h1>Análisis de Recorrido GPX</h1>
-    <form action="/" method="post" enctype="multipart/form-data">
-        <!-- Nuevo campo para el nombre de la carrera -->
-        <label for="race_name">Nombre de la Carrera:</label>
-        <input type="text" name="race_name" id="race_name" required><br><br>
+<body class="bg-gray-100 text-gray-800 p-4 sm:p-8 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-6 sm:p-10 rounded-xl shadow-lg w-full max-w-lg">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-6 text-gray-900">Análisis de Recorrido GPX</h1>
+        <form action="/" method="post" enctype="multipart/form-data" class="space-y-6">
+            
+            <!-- Campo para el nombre de la carrera -->
+            <div class="flex flex-col">
+                <label for="race_name" class="text-sm font-medium text-gray-700 mb-1">Nombre de la Carrera:</label>
+                <input type="text" name="race_name" id="race_name" required class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow">
+            </div>
 
-        <label for="gpx_file">Selecciona el archivo GPX:</label>
-        <input type="file" name="gpx_file" required><br><br>
+            <!-- Campo para el archivo GPX -->
+            <div class="flex flex-col">
+                <label for="gpx_file" class="text-sm font-medium text-gray-700 mb-1">Selecciona el archivo GPX:</label>
+                <input type="file" name="gpx_file" required class="p-3 border border-gray-300 rounded-lg bg-white text-gray-700">
+            </div>
 
-        <label for="pa_count">Cantidad de Puestos de Abastecimiento (PA):</label>
-        <input type="number" name="pa_count" id="pa_count" min="0" required><br><br>
+            <!-- Campo para la cantidad de PAs -->
+            <div class="flex flex-col">
+                <label for="pa_count" class="text-sm font-medium text-gray-700 mb-1">Cantidad de Puestos de Abastecimiento (PA):</label>
+                <input type="number" name="pa_count" id="pa_count" min="0" required class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow">
+            </div>
 
-        <div id="pa_locations_container"></div>
+            <!-- Contenedor para las ubicaciones de los PAs (será llenado por JS) -->
+            <div id="pa_locations_container" class="space-y-4"></div>
 
-        <label for="longitud_segmento">Longitud de cada sub-segmento (en metros):</label>
-        <input type="number" name="longitud_segmento" id="longitud_segmento" min="1" required><br><br>
+            <!-- Campo para la longitud del segmento -->
+            <div class="flex flex-col">
+                <label for="longitud_segmento" class="text-sm font-medium text-gray-700 mb-1">Longitud de cada sub-segmento (en metros):</label>
+                <input type="number" name="longitud_segmento" id="longitud_segmento" min="1" required class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow">
+            </div>
 
-        <br>
-        <input type="submit" value="Analizar">
-    </form>
+            <div class="pt-4">
+                <input type="submit" value="Analizar" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-full shadow-md hover:bg-blue-700 transition-colors cursor-pointer">
+            </div>
+        </form>
+    </div>
 
     <script>
+        // La lógica de JavaScript original no ha sido modificada
         document.getElementById('pa_count').addEventListener('input', function() {
             const count = parseInt(this.value);
             const container = document.getElementById('pa_locations_container');
             container.innerHTML = ''; // Limpiar entradas anteriores
             for (let i = 1; i <= count; i++) {
+                const div = document.createElement('div');
+                div.className = 'flex flex-col';
                 const label = document.createElement('label');
                 label.textContent = `Ubicación del PA ${i} (en KM desde el origen): `;
+                label.className = 'text-sm font-medium text-gray-700 mb-1';
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.name = `pa_location_${i}`;
                 input.step = "0.1";
                 input.required = true;
-                container.appendChild(label);
-                container.appendChild(input);
-                container.appendChild(document.createElement('br'));
-                container.appendChild(document.createElement('br'));
+                input.className = 'p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow';
+                div.appendChild(label);
+                div.appendChild(input);
+                container.appendChild(div);
             }
         });
     </script>
