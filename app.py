@@ -87,6 +87,27 @@ def generate_plot(gpx_data, pa_locations, plot_type='altimetry', race_name='Reco
     buf.seek(0)
     plt.close(fig)
     return buf
+    
+import folium
+
+def create_osm_map(gpx_data):
+    points = gpx_data.tracks[0].segments[0].points
+    coords = [(p.latitude, p.longitude) for p in points]
+
+    # Crear mapa centrado en el primer punto
+    osm_map = folium.Map(location=coords[0], zoom_start=13)
+
+    # Dibujar la ruta
+    folium.PolyLine(coords, color="blue", weight=3).add_to(osm_map)
+
+    # Marcar inicio y fin
+    folium.Marker(coords[0], tooltip="Inicio", icon=folium.Icon(color="green")).add_to(osm_map)
+    folium.Marker(coords[-1], tooltip="Fin", icon=folium.Icon(color="red")).add_to(osm_map)
+
+    # Guardar en la carpeta static
+    map_path = os.path.join(app.config['STATIC_FOLDER'], 'osm_map.html')
+    osm_map.save(map_path)
+    return map_path
 
 def analyze_segments(gpx_data, pa_locations, sub_segment_length):
     """
@@ -388,10 +409,16 @@ def handle_form():
             time_results = calculate_time_metrics(pace_data, pa_locations_km, segment_data, rest_stops)
             pa_summary = calculate_pa_summary(pa_locations_km, segment_data, time_results)
 
+            # La llamada a create_osm_map se ha movido al bloque de subida del archivo.
+            # No la necesitamos aquí, pero aún necesitamos la URL del mapa OSM
+            # para pasarla a la plantilla. La URL está en la sesión.
+            osm_map_url = session.get('osm_map_url', '#')
+
             return render_template('results.html',
-                                   race_name=race_name_str, # El nombre de la carrera se pasa a la plantilla
+                                   race_name=race_name_str,
                                    altimetry_plot_url=altimetry_url,
                                    map_plot_url=map_url,
+                                   osm_map_url=osm_map_url,
                                    segment_data=segment_data,
                                    pa_locations=pa_locations_km,
                                    sub_segment_length=sub_segment_length,
@@ -432,7 +459,7 @@ def handle_form():
                 if sub_segment_length <= 0:
                      return "Error: La longitud del sub-segmento debe ser un número entero positivo mayor que cero.", 400
 
-                # Pasar el nombre de la carrera a las funciones que generan los gráficos
+                # Paso 1: Generar el mapa de altimetría y el mapa 2D
                 altimetry_buffer = generate_plot(gpx_data, pa_locations_km, 'altimetry', race_name)
                 map_buffer = generate_plot(gpx_data, pa_locations_km, 'map', race_name)
                 
@@ -444,6 +471,10 @@ def handle_form():
                 
                 with open(map_img_path, 'wb') as f:
                     f.write(map_buffer.read())
+
+                # Paso 2: Generar el mapa OSM y guardar su ruta en la sesión
+                osm_map_path = create_osm_map(gpx_data)
+                session['osm_map_url'] = url_for('static', filename='plots/osm_map.html')
                 
                 segment_data = analyze_segments(gpx_data, pa_locations_km, sub_segment_length)
                 
@@ -451,6 +482,7 @@ def handle_form():
                                        race_name=race_name, # El nombre de la carrera se pasa a la plantilla
                                        altimetry_plot_url=url_for('static', filename='plots/altimetry.png'),
                                        map_plot_url=url_for('static', filename='plots/map.png'),
+                                       osm_map_url=session.get('osm_map_url'), # Ahora se obtiene de la sesión
                                        segment_data=segment_data,
                                        pa_locations=pa_locations_km,
                                        sub_segment_length=sub_segment_length)
