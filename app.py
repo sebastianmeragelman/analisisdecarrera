@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, url_for, session
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import folium
 
 # Se configura el backend de Matplotlib para poder generar gráficos
 matplotlib.use('Agg')
@@ -88,9 +89,20 @@ def generate_plot(gpx_data, pa_locations, plot_type='altimetry', race_name='Reco
     plt.close(fig)
     return buf
     
-import folium
-
-def create_osm_map(gpx_data):
+def create_osm_map(gpx_data, pa_locations):
+    """
+    Genera un mapa interactivo con la ruta y los marcadores de PAs.
+    
+    Args:
+        gpx_data (gpxpy.gpx.GPX): Objeto GPX analizado.
+        pa_locations (list): Lista de ubicaciones de PA en KM.
+        
+    Returns:
+        str: Ruta al archivo HTML del mapa.
+    """
+    if not gpx_data.tracks or not gpx_data.tracks[0].segments:
+        return None
+        
     points = gpx_data.tracks[0].segments[0].points
     coords = [(p.latitude, p.longitude) for p in points]
 
@@ -103,6 +115,30 @@ def create_osm_map(gpx_data):
     # Marcar inicio y fin
     folium.Marker(coords[0], tooltip="Inicio", icon=folium.Icon(color="green")).add_to(osm_map)
     folium.Marker(coords[-1], tooltip="Fin", icon=folium.Icon(color="red")).add_to(osm_map)
+
+    # --- INICIO DE LA NUEVA LÓGICA PARA MARCADORES DE PA ---
+    # Calcular la distancia acumulada de los puntos
+    dists = [0]
+    for i in range(1, len(points)):
+        d = points[i].distance_2d(points[i-1])
+        dists.append(dists[-1] + d)
+    dists_km = [d / 1000 for d in dists]
+
+    # Añadir marcadores para cada PA
+    for i, pa_dist_km in enumerate(pa_locations):
+        # Encontrar el punto GPX más cercano a la distancia del PA
+        closest_point_index = np.argmin(np.abs(np.array(dists_km) - pa_dist_km))
+        closest_point = points[closest_point_index]
+        
+        pa_coords = (closest_point.latitude, closest_point.longitude)
+        
+        # Añadir un marcador de círculo con un popup que muestre la distancia
+        folium.Marker(
+            location=pa_coords,
+            popup=f"PA {i+1} ({pa_dist_km} km)",
+            icon=folium.Icon(color="orange", icon="info-sign")
+        ).add_to(osm_map)
+    # --- FIN DE LA NUEVA LÓGICA ---
 
     # Guardar en la carpeta static
     map_path = os.path.join(app.config['STATIC_FOLDER'], 'osm_map.html')
@@ -473,7 +509,8 @@ def handle_form():
                     f.write(map_buffer.read())
 
                 # Paso 2: Generar el mapa OSM y guardar su ruta en la sesión
-                osm_map_path = create_osm_map(gpx_data)
+                # La llamada ahora incluye la lista de ubicaciones de PA
+                osm_map_path = create_osm_map(gpx_data, pa_locations_km)
                 session['osm_map_url'] = url_for('static', filename='plots/osm_map.html')
                 
                 segment_data = analyze_segments(gpx_data, pa_locations_km, sub_segment_length)
